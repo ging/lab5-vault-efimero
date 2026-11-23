@@ -1,0 +1,61 @@
+name: lab5-vault-efimero
+
+services:
+  postgres:
+    image: postgres:16.4
+    container_name: postgres-lab5
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: appdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/init-db:/docker-entrypoint-initdb.d:ro
+    # Sin "ports": nadie necesita llegar a Postgres desde fuera de la red de Docker.
+    # El alumno entra por Adminer (web), que conecta por la red interna a postgres:5432.
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U $${POSTGRES_USER} -d appdb"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vault:
+    image: hashicorp/vault:1.21.1
+    container_name: vault-lab5
+    restart: unless-stopped
+    # "server" a secas, sin "-dev": la imagen trae "server -dev" por defecto. Sin este
+    # override arrancaría en modo dev (memoria, autodesellado, token fijo) — aquí
+    # queremos el Vault real: storage en fichero, sellado, init/unseal de verdad.
+    command: server
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./config/vault.hcl:/vault/config/vault.hcl:ro
+      - vault_data:/vault/file
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Cliente SQL web: es "la aplicación" que usa las credenciales efímeras de Vault.
+  # Llega a Postgres por red (no por loopback), así que Postgres SÍ exige contraseña
+  # — la imagen oficial solo deja "trust" para 127.0.0.1/::1 dentro de su contenedor.
+  adminer:
+    image: adminer:5.5.1
+    container_name: adminer-lab5
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "8083:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  vault_data:
