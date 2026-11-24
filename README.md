@@ -132,8 +132,12 @@ Compruebe que todo funciona:
    - **Create database**.
 
 5. **Rotación de la credencial root:** Vault pregunta a continuación **Rotate your root
-   credentials?**. Elija **Enable without rotating**. Si se rotara, Vault cambiaría la contraseña de
-   `appadmin` por una que solo él conoce, y la de `.env` dejaría de servir.
+   credentials?**. Elija **Rotate and enable**. Vault cambia la contraseña de `appadmin` por una que
+   solo él conoce, y la de `.env` deja de servir.
+
+> **Pregunta 3.1.** Tras la rotación, nadie conoce la contraseña del superusuario `appadmin`. ¿Qué
+> implica esto? Si un administrador necesita entrar en la base de datos con todos los privilegios,
+> ¿cómo podría hacerlo sin volver a tener una contraseña fija?
 
 6. **Crear el rol:** pestaña **Roles** → **Create role**.
    - **Role name**: `app-readonly`. **Database name**: `appdb`.
@@ -169,11 +173,12 @@ Compruebe que todo funciona:
    - **Usuario** y **Contraseña**: los que acaba de dar Vault.
    - **Base de datos**: `appdb` → **Login**.
 
-   Abra la tabla `inventario` → **Mostrar datos** (*Select data*): aparecen las tres filas de
-   ejemplo. El acceso funciona con un usuario que hace un minuto no existía.
+   En el menú lateral, pulse **registros inventario** (en inglés, *select inventario*): aparecen
+   las tres filas de ejemplo. El acceso funciona con un usuario que hace un minuto no existía.
 
-9. **Esperar al TTL:** cuando hayan pasado 60 segundos desde el paso 7, **cierre la sesión** de
-   Adminer e intente entrar de nuevo con las mismas credenciales. La conexión falla:
+9. **Esperar al TTL:** cuando hayan pasado 60 segundos desde el paso 7, pulse cualquier enlace de
+   Adminer (por ejemplo, otra vez **registros inventario**). No hace falta cerrar la sesión: Adminer
+   abre una conexión nueva en cada clic, y esta vez falla y le devuelve al inicio de sesión:
    ```
    FATAL:  password authentication failed for user "v-root-app-read-..."
    ```
@@ -185,15 +190,16 @@ Compruebe que todo funciona:
 <details>
 <summary><strong>En detalle (opcional):</strong> ver nacer y morir los usuarios desde dentro de PostgreSQL. No es necesario para continuar.</summary>
 
-En una ventana privada del navegador, entre en Adminer como el superusuario (`appadmin` /
-`appadmin`) → **Comando SQL** y ejecute:
+No hace falta el superusuario: cualquier usuario puede consultar la lista de usuarios. Con la sesión
+del paso 8 abierta, vaya a Adminer → **Comando SQL** y ejecute:
 
 ```sql
 SELECT rolname, rolvaliduntil FROM pg_roles WHERE rolname LIKE 'v-%';
 ```
 
-Repítalo justo después de un **Generate credentials** (aparece el usuario, con la fecha de caducidad
-que fija el `VALID UNTIL` de las Creation Statements) y pasado el minuto (ya no está).
+Aparece su propio usuario, con la fecha de caducidad que fija el `VALID UNTIL` de las Creation
+Statements. Repita la consulta entrando con las credenciales del paso 10: el usuario anterior ya no
+está, y solo aparece el nuevo.
 
 </details>
 
@@ -212,6 +218,10 @@ Esperar al TTL solo demuestra que un inicio de sesión *nuevo* falla. Este apart
 distinto: que el administrador puede **revocar** una credencial antes de tiempo y cortar incluso una
 conexión que ya está en marcha. Todo debe hacerse dentro de los 60 segundos del TTL, así que conviene
 tener Vault y Adminer abiertos en dos pestañas antes de empezar.
+
+> **Si no le da tiempo:** suba el TTL del rol. En Vault, abra el rol `app-readonly` → **Edit role** y
+> ponga, por ejemplo, **TTL** = `300` segundos y **Max TTL** = `600`. El cambio solo afecta a las
+> credenciales que se pidan a partir de entonces: pida unas nuevas. Vale también para el apartado 4.
 
 1. **Pida credenciales nuevas** (paso 7), apunte el `Lease ID` y **entre con ellas en Adminer**
    (paso 8).
@@ -251,13 +261,15 @@ tener Vault y Adminer abiertos en dos pestañas antes de empezar.
 - **La consola de Vault vuelve a pedir el token** al recargar la página o escribir una URL a mano. No
   es que se haya sellado (en ese caso la pantalla sería **Unseal**, no **Sign in**): pegue de nuevo el
   token root. Moverse siempre con el menú lateral evita el problema.
-- **Falla el paso 7 (Generate credentials).** Revise la **Connection URL** del paso 4: el servidor es
-  `postgres`, no `localhost`, y debe terminar en `?sslmode=disable`.
+- **Falla el paso 4 (Create database) con `connection refused`.** Revise la **Connection URL**: el
+  servidor es `postgres`, no `localhost`, y debe terminar en `?sslmode=disable`.
 - **`password authentication failed for user "[password]"`** (u otro texto extraño) al guardar la
   conexión: se ha escrito la plantilla de la URL en los campos **Username**/**Password**. Esos dos
   campos llevan `appadmin` / `appadmin`.
 - **Adminer muestra un error que menciona MySQL:** el **Motor de base de datos** sigue en
   `MySQL / MariaDB`. Cámbielo a `PostgreSQL`.
+- **Las credenciales caducan antes de terminar el paso:** suba el TTL y el Max TTL del rol (vea la
+  nota del apartado 5) y pida credenciales nuevas.
 - **La revocación del apartado 5 no corta la consulta:** faltan las Revocation Statements del paso 6.
   Edite el rol y añádalas.
 - Para reiniciar el entorno desde cero (se pierde toda la configuración de Vault y habrá que
