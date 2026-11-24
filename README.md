@@ -191,7 +191,7 @@ Compruebe que todo funciona:
 <summary><strong>En detalle (opcional):</strong> ver nacer y morir los usuarios desde dentro de PostgreSQL. No es necesario para continuar.</summary>
 
 No hace falta el superusuario: cualquier usuario puede consultar la lista de usuarios. Con la sesión
-del paso 8 abierta, vaya a Adminer → **Comando SQL** y ejecute:
+del paso 8 abierta, y antes de que pase el minuto, vaya a Adminer → **Comando SQL** y ejecute:
 
 ```sql
 SELECT rolname, rolvaliduntil FROM pg_roles WHERE rolname LIKE 'v-%';
@@ -263,9 +263,13 @@ tener Vault y Adminer abiertos en dos pestañas antes de empezar.
   token root. Moverse siempre con el menú lateral evita el problema.
 - **Falla el paso 4 (Create database) con `connection refused`.** Revise la **Connection URL**: el
   servidor es `postgres`, no `localhost`, y debe terminar en `?sslmode=disable`.
-- **`password authentication failed for user "[password]"`** (u otro texto extraño) al guardar la
-  conexión: se ha escrito la plantilla de la URL en los campos **Username**/**Password**. Esos dos
-  campos llevan `appadmin` / `appadmin`.
+- **`password authentication failed for user "[password]"`** al guardar la conexión: la contraseña
+  del superusuario no es correcta. Vault oculta la contraseña en sus errores como `[password]`, y
+  como aquí usuario y contraseña coinciden, oculta también el nombre. Compruebe que **Username** y
+  **Password** son `appadmin` / `appadmin` y que la plantilla con llaves está solo en la URL. Si ya
+  había rotado la credencial (paso 5) y está creando la conexión otra vez, `appadmin` / `appadmin`
+  ya no sirve: avise al profesor, o empiece de cero con `docker compose down -v && docker compose
+  up -d`.
 - **Adminer muestra un error que menciona MySQL:** el **Motor de base de datos** sigue en
   `MySQL / MariaDB`. Cámbielo a `PostgreSQL`.
 - **Las credenciales caducan antes de terminar el paso:** suba el TTL y el Max TTL del rol (vea la
