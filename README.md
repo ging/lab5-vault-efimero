@@ -116,10 +116,10 @@ Compruebe que todo funciona:
 
 ## 3. Configuración del acceso efímero
 
-3. **Habilitar el motor de bases de datos:** menú lateral → **Secrets engines** → **Enable new
+1. **Habilitar el motor de bases de datos:** menú lateral → **Secrets engines** → **Enable new
    engine** → **Database** → **Enable Engine** (deje la ruta por defecto, `database/`).
 
-4. **Configurar la conexión con PostgreSQL:** dentro de `database/`, pulse **Connect a database**.
+2. **Configurar la conexión con PostgreSQL:** dentro de `database/`, pulse **Connect a database**.
    - **Database plugin**: `PostgreSQL`. El resto de campos aparece después de elegirlo.
    - **Connection name**: `appdb`.
    - **Connection URL**:
@@ -131,7 +131,7 @@ Compruebe que todo funciona:
      `appadmin`, los de `.env`. Es el superusuario que Vault usará para crear y borrar usuarios.
    - **Create database**.
 
-5. **Rotación de la credencial root:** Vault pregunta a continuación **Rotate your root
+3. **Rotación de la credencial root:** Vault pregunta a continuación **Rotate your root
    credentials?**. Elija **Rotate and enable**. Vault cambia la contraseña de `appadmin` por una que
    solo él conoce, y la de `.env` deja de servir.
 
@@ -139,7 +139,7 @@ Compruebe que todo funciona:
 > implica esto? Si un administrador necesita entrar en la base de datos con todos los privilegios,
 > ¿cómo podría hacerlo sin volver a tener una contraseña fija?
 
-6. **Crear el rol:** pestaña **Roles** → **Create role**.
+4. **Crear el rol:** pestaña **Roles** → **Create role**.
    - **Role name**: `app-readonly`. **Database name**: `appdb`.
    - **Type of role**: `dynamic`. Hasta que no se elige, el formulario no muestra los campos
      siguientes.
@@ -163,11 +163,11 @@ Compruebe que todo funciona:
 
 ## 4. Credenciales bajo demanda
 
-7. **Pedir credenciales:** abra el rol `app-readonly` → **Generate credentials**. Vault muestra un
+1. **Pedir credenciales:** abra el rol `app-readonly` → **Generate credentials**. Vault muestra un
    `Username`, un `Password`, un `Lease ID` y `Lease Duration: 60`. Cópielos: no se pueden volver a
    ver.
 
-8. **Usarlas:** en Adminer (`http://localhost:8083`):
+2. **Usarlas:** en Adminer (`http://localhost:8083`):
    - **Motor de base de datos** (*System*): `PostgreSQL`. Por defecto viene MySQL.
    - **Servidor**: `postgres` (ya viene relleno).
    - **Usuario** y **Contraseña**: los que acaba de dar Vault.
@@ -176,7 +176,7 @@ Compruebe que todo funciona:
    En el menú lateral, pulse **registros inventario** (en inglés, *select inventario*): aparecen
    las tres filas de ejemplo. El acceso funciona con un usuario que hace un minuto no existía.
 
-9. **Esperar al TTL:** cuando hayan pasado 60 segundos desde el paso 7, pulse cualquier enlace de
+3. **Esperar al TTL:** cuando hayan pasado 60 segundos desde el paso 1, pulse cualquier enlace de
    Adminer (por ejemplo, otra vez **registros inventario**). No hace falta cerrar la sesión: Adminer
    abre una conexión nueva en cada clic, y esta vez falla y le devuelve al inicio de sesión:
    ```
@@ -184,26 +184,26 @@ Compruebe que todo funciona:
    ```
    Vault ha borrado el usuario de PostgreSQL al caducar el lease, sin que nadie se lo pida.
 
-10. **Pedir credenciales otra vez** (repita el paso 7) y compruebe que el `Username` es distinto: cada
+4. **Pedir credenciales otra vez** (repita el paso 1) y compruebe que el `Username` es distinto: cada
     petición crea un usuario nuevo.
 
 <details>
 <summary><strong>En detalle (opcional):</strong> ver nacer y morir los usuarios desde dentro de PostgreSQL. No es necesario para continuar.</summary>
 
 No hace falta el superusuario: cualquier usuario puede consultar la lista de usuarios. Con la sesión
-del paso 8 abierta, y antes de que pase el minuto, vaya a Adminer → **Comando SQL** y ejecute:
+del paso 2 abierta, y antes de que pase el minuto, vaya a Adminer → **Comando SQL** y ejecute:
 
 ```sql
 SELECT rolname, rolvaliduntil FROM pg_roles WHERE rolname LIKE 'v-%';
 ```
 
 Aparece su propio usuario, con la fecha de caducidad que fija el `VALID UNTIL` de las Creation
-Statements. Repita la consulta entrando con las credenciales del paso 10: el usuario anterior ya no
+Statements. Repita la consulta entrando con las credenciales del paso 4: el usuario anterior ya no
 está, y solo aparece el nuevo.
 
 </details>
 
-> **Pregunta 4.1.** El usuario ya no existe en PostgreSQL, pero el error del paso 9 dice "password
+> **Pregunta 4.1.** El usuario ya no existe en PostgreSQL, pero el error del paso 3 dice "password
 > authentication failed", no "el usuario no existe". ¿Por qué cree que PostgreSQL responde así?
 
 > **Pregunta 4.2.** Supóngase que alguien intercepta una de estas credenciales, por ejemplo porque
@@ -223,8 +223,8 @@ tener Vault y Adminer abiertos en dos pestañas antes de empezar.
 > ponga, por ejemplo, **TTL** = `300` segundos y **Max TTL** = `600`. El cambio solo afecta a las
 > credenciales que se pidan a partir de entonces: pida unas nuevas. Vale también para el apartado 4.
 
-1. **Pida credenciales nuevas** (paso 7), apunte el `Lease ID` y **entre con ellas en Adminer**
-   (paso 8).
+1. **Pida credenciales nuevas** (paso 1 del apartado 4), apunte el `Lease ID` y **entre con ellas en
+   Adminer** (paso 2 del apartado 4).
 2. **Lance una consulta lenta**, para tener algo en marcha que cortar: Adminer → **Comando SQL**
    (*SQL command*) →
    ```sql
@@ -256,25 +256,25 @@ tener Vault y Adminer abiertos en dos pestañas antes de empezar.
   Vault queda sellado para siempre. Hay que empezar de cero: `docker compose down -v && docker compose
   up -d`, y repetir desde el apartado 2.
 - **Vault vuelve a estar sellado** tras reiniciar el contenedor (o el ordenador). Es su
-  comportamiento normal: repita el paso 2 con tres claves. El motor, la conexión y el rol siguen
+  comportamiento normal: repita el paso 2 del apartado 2 con tres claves. El motor, la conexión y el rol siguen
   configurados.
 - **La consola de Vault vuelve a pedir el token** al recargar la página o escribir una URL a mano. No
   es que se haya sellado (en ese caso la pantalla sería **Unseal**, no **Sign in**): pegue de nuevo el
   token root. Moverse siempre con el menú lateral evita el problema.
-- **Falla el paso 4 (Create database) con `connection refused`.** Revise la **Connection URL**: el
+- **Falla el paso 2 del apartado 3 (Create database) con `connection refused`.** Revise la **Connection URL**: el
   servidor es `postgres`, no `localhost`, y debe terminar en `?sslmode=disable`.
 - **`password authentication failed for user "[password]"`** al guardar la conexión: la contraseña
   del superusuario no es correcta. Vault oculta la contraseña en sus errores como `[password]`, y
   como aquí usuario y contraseña coinciden, oculta también el nombre. Compruebe que **Username** y
   **Password** son `appadmin` / `appadmin` y que la plantilla con llaves está solo en la URL. Si ya
-  había rotado la credencial (paso 5) y está creando la conexión otra vez, `appadmin` / `appadmin`
+  había rotado la credencial (paso 3 del apartado 3) y está creando la conexión otra vez, `appadmin` / `appadmin`
   ya no sirve: avise al profesor, o empiece de cero con `docker compose down -v && docker compose
   up -d`.
 - **Adminer muestra un error que menciona MySQL:** el **Motor de base de datos** sigue en
   `MySQL / MariaDB`. Cámbielo a `PostgreSQL`.
 - **Las credenciales caducan antes de terminar el paso:** suba el TTL y el Max TTL del rol (vea la
   nota del apartado 5) y pida credenciales nuevas.
-- **La revocación del apartado 5 no corta la consulta:** faltan las Revocation Statements del paso 6.
+- **La revocación del apartado 5 no corta la consulta:** faltan las Revocation Statements del paso 4 del apartado 3.
   Edite el rol y añádalas.
 - Para reiniciar el entorno desde cero (se pierde toda la configuración de Vault y habrá que
   inicializarlo de nuevo): `docker compose down -v && docker compose up -d`.
